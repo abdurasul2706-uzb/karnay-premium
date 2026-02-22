@@ -17,7 +17,7 @@ uzb_tz = pytz.timezone('Asia/Tashkent')
 # Render uchun kichik server
 app = Flask('')
 @app.route('/')
-def home(): return "Karnay Premium System is Running... 🚀"
+def home(): return "OK"
 def run(): app.run(host='0.0.0.0', port=8080)
 def keep_alive(): Thread(target=run).start()
 
