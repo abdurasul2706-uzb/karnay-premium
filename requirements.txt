@@ -1,0 +1,7 @@
+pyTelegramBotAPI
+feedparser
+requests
+beautifulsoup4
+googletrans==3.1.0a0
+flask
+pytz
