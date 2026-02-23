@@ -3,5 +3,3 @@ pyTelegramBotAPI
 requests
 pytz
 flask
-feedparser
-beautifulsoup4
