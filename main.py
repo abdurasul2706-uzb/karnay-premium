@@ -10,7 +10,6 @@ from flask import Flask
 # 1. SOZLAMALAR
 TOKEN = '8222976736:AAEWUSTKnEGZiP9USYBAECbtZkLGtp--sEc'
 CHANNEL_ID = '@karnayuzb'
-LOGO_URL = "https://i.postimg.cc/mD8zYpXG/Karnay-uzb.jpg" 
 
 bot = telebot.TeleBot(TOKEN)
 uzb_tz = pytz.timezone('Asia/Tashkent')
@@ -25,7 +24,7 @@ def keep_alive(): Thread(target=run).start()
 # 2. BARCHA BANKLAR KURSI (30+ BANK)
 def get_all_uzb_banks():
     try:
-        cb = requests.get("https://cbu.uz/uz/arkhiv-kursov-valyut/json/").json()
+        cb = requests.get("https://cbu.uz/uz/arkhiv-kursov-valyut/json/", timeout=15).json()
         usd = next(i for i in cb if i['Ccy'] == 'USD')['Rate']
         text = f"💰 **O'ZBEKISTON BARCHA BANKLARIDA DOLLAR**\n"
         text += f"📅 Bugun: {datetime.now(uzb_tz).strftime('%d.%m.%Y')}\n"
@@ -47,25 +46,25 @@ def get_all_uzb_banks():
         for name, rate in banks: text += f"{name}: `{rate}` so'm\n"
         text += f"\n🔄 *Ma'lumotlar avtomatik yangilandi*\n✅ @karnayuzb"
         return text
-    except: return "Banklar ma'lumoti yuklanmadi."
+    except Exception as e: return f"Banklar ma'lumoti yuklanmadi."
 
 # 3. NAMOZ VAQTLARI
 def get_daily_prayers():
     try:
-        res = requests.get("http://islomapi.uz/api/present/day?region=Toshkent").json()
+        res = requests.get("http://islomapi.uz/api/present/day?region=Toshkent", timeout=15).json()
         v = res['times']
         text = f"🕋 **NAMOZ VAQTLARI (Toshkent)**\n\n"
         text += f"🏙 Bomdod: {v['tong_saharlik']}\n🌅 Quyosh: {v['quyosh']}\n"
         text += f"🏙 Peshin: {v['peshin']}\n🌆 Asr: {v['asr']}\n"
         text += f"🌇 Shom: {v['shom_iftor']}\n🌃 Xufton: {v['hufton']}\n\n"
-        text += f"✅ @karnayuzb"
+        text += f"✅ @karnayuzb — Iymon nuri!"
         return text
     except: return "Namoz vaqtlari yuklanmadi."
 
 # 4. RANDOM VIKTORINA
 def send_smart_quiz():
     try:
-        res = requests.get("https://opentdb.com/api.php?amount=1&type=multiple").json()
+        res = requests.get("https://opentdb.com/api.php?amount=1&type=multiple", timeout=15).json()
         q = res['results'][0]
         quest = q['question'].replace("&quot;", "'").replace("&#039;", "'")
         corr = q['correct_answer']
@@ -76,44 +75,54 @@ def send_smart_quiz():
 
 # 5. ASOSIY SCHEDULER
 def run_scheduler():
-    l_time = ""
+    # Har bir amal uchun alohida kunlik marker
+    l_tong, l_namoz, l_bank, l_quiz, l_tun = "", "", "", "", ""
     while True:
         try:
             now = datetime.now(uzb_tz)
-            cur, day = now.strftime("%H:%M"), now.strftime("%Y-%m-%d")
+            cur = now.strftime("%H:%M")
+            day = now.strftime("%Y-%m-%d")
 
-            # ☀️ XAYRLI TONG (06:00)
-            if cur == "06:00" and l_time != (day + "06:00"):
-                matn = (f"☀️ **ASSALOMU ALAYKUM VA RAHMATULLOHI VA BAROKATUH!**\n\n"
+            # ☀️ XAYRLI TONG (06:00 - 06:15 oralig'ida)
+            if "06:00" <= cur <= "06:15" and l_tong != day:
+                matn = (f"☀️ **ASSALOMU ALAYKUM, AZIZ QADRDONIM!**\n\n"
                         f"🏙 Bugun: **{now.strftime('%d-%B, %A')}**\n\n"
-                        f"🍃 Boshlangan yangi kuningiz fayzli, barokatli va muvaffaqiyatli bo'lsin. "
-                        f"Alloh xonadoningizga tinchlik, taningizga sog'lik, ishlaringizga unum bersin. "
-                        f"Bugun rejalashtirgan barcha yaxshi niyatlaringiz ijobat bo'lishini tilaymiz!\n\n"
-                        f"😊 Kun davomida a'lo kayfiyat sizni tark etmasin!\n\n✅ @karnayuzb")
-                bot.send_photo(CHANNEL_ID, LOGO_URL, caption=matn, parse_mode='Markdown')
-                l_time = (day + "06:00")
+                        f"🌿 Musaffo tong muborak bo'lsin! Ushbu yangi kun sizga quvonch, omad va kutilmagan xushxabarlar olib kelsin. "
+                        f"Qalbingiz xotirjamlikka, xonadoningiz fayz-u barakaga to'lsin. Alloh barcha ezgu niyatlaringizni ijobat qilsin. "
+                        f"Bugungi har bir daqiqa siz uchun mazmunli o'tishini tilaymiz!\n\n"
+                        f"😊 Tabassum yuzingizni hech qachon tark etmasin!\n\n✅ @karnayuzb")
+                bot.send_message(CHANNEL_ID, matn, parse_mode='Markdown')
+                l_tong = day
 
-            # 🕋 NAMOZ (07:00) / 💰 BANK (10:00) / 🧠 VIKTORINA (13:00, 17:00, 21:00)
-            if cur == "07:00" and l_time != (day + "07:00"):
-                bot.send_photo(CHANNEL_ID, LOGO_URL, caption=get_daily_prayers(), parse_mode='Markdown'); l_time = (day + "07:00")
-            if cur == "10:00" and l_time != (day + "10:00"):
-                bot.send_photo(CHANNEL_ID, LOGO_URL, caption=get_all_uzb_banks(), parse_mode='Markdown'); l_time = (day + "10:00")
-            if cur in ["13:00", "17:00", "21:00"] and l_time != (day + cur):
-                send_smart_quiz(); l_time = (day + cur)
+            # 🕋 NAMOZ VAQTLARI (07:00 - 07:15 oralig'ida)
+            if "07:00" <= cur <= "07:15" and l_namoz != day:
+                bot.send_message(CHANNEL_ID, get_daily_prayers(), parse_mode='Markdown')
+                l_namoz = day
 
-            # 🌙 XAYRLI TUN (23:45)
-            if cur == "23:45" and l_time != (day + "23:45"):
-                matn = (f"🌙 **XAYRLI TUN, AZIZ DINDOSHIM!**\n\n"
-                        f"✨ Bugungi kuningiz qanday o'tgan bo'lishidan qat'iy nazar, "
-                        f"shukronalik bilan orom oling. Alloh omonat bo'lgan jonimizni "
-                        f"ertangi go'zal tongga sog'-salomat uyg'otsin.\n\n"
-                        f"💤 Tuningiz osuda, oromingiz shirin bo'lsin. Yaxshi dam oling!\n\n✅ @karnayuzb")
-                bot.send_photo(CHANNEL_ID, LOGO_URL, caption=matn, parse_mode='Markdown')
-                l_time = (day + "23:45")
+            # 💰 BANK KURSLARI (10:00 - 10:15 oralig'ida)
+            if "10:00" <= cur <= "10:15" and l_bank != day:
+                bot.send_message(CHANNEL_ID, get_all_uzb_banks(), parse_mode='Markdown')
+                l_bank = day
 
-            time.sleep(30)
+            # 🧠 VIKTORINALAR (Aniq vaqtda 3 marta)
+            if cur in ["13:00", "17:00", "21:00"] and l_quiz != (day + cur):
+                send_smart_quiz()
+                l_quiz = (day + cur)
+
+            # 🌙 XAYRLI TUN (23:45 - 23:55 oralig'ida)
+            if "23:45" <= cur <= "23:55" and l_tun != day:
+                matn = (f"🌙 **XAYRLI TUN, AZIZ OBUNACHIMIZ!**\n\n"
+                        f"✨ Yana bir xayrli kun o'z nihoyasiga yetdi. Bugun qilgan barcha ezgu amallaringizni Alloh qabul qilsin. "
+                        f"Charchoqlaringiz chiqib, oromingiz osuda bo'lsin. Ertangi nurli tongga barchamizni sog'-salomat, "
+                        f"yangi maqsadlar va ulkan umidlar bilan yetkazsin.\n\n"
+                        f"💤 Tuningiz tinch, tushlaringiz shirin bo'lsin. Yaxshi dam oling!\n\n✅ @karnayuzb")
+                bot.send_message(CHANNEL_ID, matn, parse_mode='Markdown')
+                l_tun = day
+
         except Exception as e:
-            print(f"Xato: {e}"); time.sleep(10)
+            print(f"Xato: {e}")
+        
+        time.sleep(40)
 
 if __name__ == "__main__":
     keep_alive()
