@@ -1,5 +1,7 @@
-googletrans==3.1.0a0
 pyTelegramBotAPI
+feedparser
 requests
-pytz
+beautifulsoup4
+googletrans==3.1.0a0
 flask
+pytz
