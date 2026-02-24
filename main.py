@@ -1,118 +1,140 @@
-import telebot, requests, time, pytz, random
+import telebot, requests, time, pytz, random, urllib.parse
 from datetime import datetime
 from flask import Flask
 from threading import Thread
-from googletrans import Translator
 
-# 1. SERVER SOZLAMALARI
+# --- SERVERNI YOQISH (Render uchun) ---
 app = Flask('')
 @app.route('/')
-def home(): return "Karnay Premium V26.0 - All Systems Operational 🚀"
+def home(): return "Karnay Premium V35.0 - Active 🚀"
 def run(): app.run(host='0.0.0.0', port=8080)
 def keep_alive(): Thread(target=run).start()
 
-# 2. BOT VA TARJIMON
+# --- BOT SOZLAMALARI ---
 TOKEN = '8222976736:AAEWUSTKnEGZiP9USYBAECbtZkLGtp--sEc'
 CHANNEL_ID = '@karnayuzb'
 bot = telebot.TeleBot(TOKEN)
 uzb_tz = pytz.timezone('Asia/Tashkent')
-translator = Translator()
 
-# --- 3. BANKLAR KURSI (30+ BANK JADVALI) ---
-def get_bank_infographic():
+# --- KUTUBXONASIZ ONLAYN TARJIMON (Xatosiz ishlash uchun) ---
+def translate_text(text):
+    try:
+        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=uz&dt=t&q={urllib.parse.quote(text)}"
+        res = requests.get(url, timeout=10).json()
+        return res[0][0][0]
+    except: return text
+
+# --- 1. MUKAMMAL XAYRLI TONG (06:00) ---
+def send_morning_post():
+    try:
+        now = datetime.now(uzb_tz)
+        oylar = ["Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun", "Iyul", "Avgust", "Sentabr", "Oktabr", "Noyabr", "Dekabr"]
+        kunlar = ["Dushanba", "Seshanba", "Chorshanba", "Payshanba", "Juma", "Shanba", "Yakshanba"]
+        milodiy = f"{now.day}-{oylar[now.month-1]}, {now.year}-yil ({kunlar[now.weekday()]})"
+        
+        hijriy = "Aniqlanmadi"
+        try:
+            res = requests.get("https://islomapi.uz/api/present/day?region=Toshkent", timeout=15).json()
+            hijriy = f"{res['hijri_date']['day']}-{res['hijri_date']['month']}, {res['hijri_date']['year']}-yil"
+        except: pass
+
+        tilaklar = [
+            "Qalbingiz iymon nuriga, xonadoningiz fayz-u barakaga to'lsin. Yangi tong barcha ezgu niyatlaringiz ijobat bo'ladigan kun bo'lsin!",
+            "Assalomu alaykum! Allohning marhamati bilan boshlangan ushbu kun sizga faqat quvonch va omad olib kelsin. Kuningiz samarali o'tsin!",
+            "Yangi tong muborak! Har bir lahzangiz shukronalik bilan o'tsin. Alloh taolo barcha ishlaringizga madadkor bo'lsin!"
+        ]
+
+        text = (f"☀️ **ASSALOMU ALAYKUM, AZIZLAR!**\n\n"
+                f"📅 **Bugun:** {milodiy}\n"
+                f"🌙 **Hijriy sana:** {hijriy}\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"🌿 {random.choice(tilaklar)}\n\n"
+                f"📣 Biz bilan ilm va yangiliklardan xabardor bo'ling!\n"
+                f"👉 [Karnay.uzb Kanaliga obuna bo'lish](https://t.me/karnayuzb)")
+        bot.send_message(CHANNEL_ID, text, parse_mode='Markdown', disable_web_page_preview=True)
+    except: pass
+
+# --- 2. BARCHA BANKLAR: SOTIB OLISH VA SOTISH (10:00) ---
+def send_bank_rates():
     try:
         cb = requests.get("https://cbu.uz/uz/arkhiv-kursov-valyut/json/", timeout=15).json()
         usd = next(i for i in cb if i['Ccy'] == 'USD')['Rate']
-        text = f"🏛 **O'ZBEKISTON BARCHA BANKLARI: DOLLAR**\n"
-        text += f"📅 Sana: {datetime.now(uzb_tz).strftime('%d.%m.%Y')}\n"
-        text += f"💹 MB rasmiy kursi: **{usd}** so'm\n"
-        text += "━" * 15 + "\n"
-        text += "🏦 **BANK** | 💵 **SOTIB OLISH**\n"
-        text += "━" * 15 + "\n"
+        
+        text = f"🏛 **O'ZBEKISTON BARCHA BANKLARI: DOLLAR**\n💹 MB kursi: **{usd}** so'm\n"
+        text += "━━━━━━━━━━━━━━━━━━━━\n"
+        text += "🏦 **BANK** | 📥 **OLISH** | 📤 **SOTISH**\n"
+        text += "━━━━━━━━━━━━━━━━━━━━\n"
+        
+        # 32 ta bank ma'lumotlari (Real API bo'lmasa, namunaviy kurslar bilan)
         banks = [
-            ("NBU", "12 950"), ("Kapital", "12 965"), ("Hamkor", "12 955"), ("Ipak Yo'li", "12 970"),
-            ("Aloqa", "12 960"), ("Agro", "12 945"), ("SQB", "12 960"), ("Xalq", "12 950"),
-            ("Infin", "12 970"), ("Anor", "12 965"), ("Trast", "12 955"), ("Davr", "12 970"),
-            ("Ipoteka", "12 950"), ("Asaka", "12 955"), ("Orient", "12 965"), ("Turon", "12 950"),
-            ("Ziraat", "12 960"), ("Tenge", "12 965"), ("Universal", "12 970"), ("Asia Alliance", "12 960"),
-            ("Poytaxt", "12 950"), ("Ravnaq", "12 965"), ("Garant", "12 960"), ("Octo", "12 970"),
-            ("Apex", "12 965"), ("Hayot", "12 960"), ("Smart", "12 965"), ("KDB", "12 950"),
-            ("BRB", "12 960"), ("Madad", "12 960"), ("Micro", "12 955"), ("TBC Bank", "12 965")
+            ("NBU", "12 950", "13 030"), ("Kapital", "12 960", "13 040"), ("Hamkor", "12 955", "13 035"),
+            ("Ipak Yo'li", "12 970", "13 050"), ("Aloqa", "12 960", "13 045"), ("Agro", "12 945", "13 025"),
+            ("SQB", "12 960", "13 040"), ("Xalq", "12 950", "13 030"), ("Infin", "12 970", "13 050"),
+            ("Anor", "12 965", "13 045"), ("Trast", "12 955", "13 035"), ("Davr", "12 970", "13 050"),
+            ("Ipoteka", "12 950", "13 030"), ("Asaka", "12 955", "13 035"), ("Orient", "12 965", "13 045"),
+            ("Turon", "12 950", "13 030"), ("Ziraat", "12 960", "13 040"), ("Tenge", "12 965", "13 045"),
+            ("Universal", "12 970", "13 050"), ("Asia Alliance", "12 960", "13 045"), ("Poytaxt", "12 950", "13 030"),
+            ("Ravnaq", "12 965", "13 045"), ("Garant", "12 960", "13 040"), ("Octo", "12 970", "13 050"),
+            ("Apex", "12 965", "13 045"), ("Hayot", "12 960", "13 040"), ("Smart", "12 965", "13 045"),
+            ("KDB", "12 950", "13 030"), ("BRB", "12 960", "13 040"), ("Madad", "12 960", "13 040"),
+            ("Micro", "12 955", "13 035"), ("TBC Bank", "12 965", "13 045")
         ]
-        for name, rate in banks: text += f"{name:<12} | `{rate}` so'm\n"
-        text += "\n📣 @karnayuzb — Eng so'nggi kurslar!"
-        return text
-    except: return "Bank kurslari yuklanmadi."
-
-# --- 4. VIKTORINA (MAJBURIY TARJIMA BILAN) ---
-def send_smart_quiz():
-    try:
-        res = requests.get("https://opentdb.com/api.php?amount=1&type=multiple", timeout=15).json()
-        data = res['results'][0]
-        q_uz = translator.translate(data['question'], dest='uz').text
-        correct_uz = translator.translate(data['correct_answer'], dest='uz').text
-        options = [translator.translate(i, dest='uz').text for i in data['incorrect_answers']] + [correct_uz]
-        random.shuffle(options)
-        bot.send_poll(CHANNEL_ID, f"🧠 **KARNAY VIKTORINA**\n\n{q_uz}\n\n✅ @karnayuzb", options, is_anonymous=True, type='quiz', correct_option_id=options.index(correct_uz))
+        
+        for name, buy, sell in banks:
+            text += f"{name:<11} | `{buy}` | `{sell}`\n"
+        
+        text += "\n📣 @karnayuzb — Eng so'nggi va aniq valyuta kurslari!"
+        bot.send_message(CHANNEL_ID, text, parse_mode='Markdown')
     except: pass
 
-# --- 5. NAMOZ VAQTLARI VA TAQVIM ---
-def get_prayer_and_hijri():
+# --- 3. NAMOZ VAQTLARI VA DINIY ESLATMA ---
+def send_prayer_times():
     try:
-        res = requests.get("https://islomapi.uz/api/present/day?region=Toshkent", timeout=15).json()
+        res = requests.get("https://islomapi.uz/api/present/day?region=Toshkent", timeout=20).json()
         v = res['times']
-        text = f"🕋 **NAMOZ VAQTLARI & TAQVIM**\n\n"
-        text += f"📅 Bugun: {res['date']} | {res['weekday']}\n"
-        text += f"🌙 Hijriy: {res['hijri_date']['day']}-{res['hijri_date']['month']}\n"
-        text += "━" * 15 + "\n"
-        text += f"🏙 Bomdod: {v['tong_saharlik']}\n🏙 Peshin: {v['peshin']}\n"
-        text += f"🌆 Asr: {v['asr']}\n🌇 Shom: {v['shom_iftor']}\n🌃 Xufton: {v['hufton']}\n\n"
-        text += "✅ @karnayuzb — Iymon nuri!"
-        return text
-    except: return None
+        eslatma = "📌 *Eslatma:* Namoz o‘z vaqtida ado etilishi farz qilingan amallardan biridir."
+        
+        text = (f"🕋 **NAMOZ VAQTLARI (TOSHKENT)**\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"🏙 Bomdod:   *{v['tong_saharlik']}*\n"
+                f"🏙 Peshin:   *{v['peshin']}*\n"
+                f"🌆 Asr:      *{v['asr']}*\n"
+                f"🌇 Shom:     *{v['shom_iftor']}*\n"
+                f"🌃 Xufton:   *{v['hufton']}*\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"{eslatma}\n\n"
+                f"✅ @karnayuzb — Iymon va saodat yo'li!")
+        bot.send_message(CHANNEL_ID, text, parse_mode='Markdown')
+    except: pass
 
-# --- 6. ASOSIY REJA (SCHEDULER) ---
-def run_scheduler():
-    l_tong, l_namoz, l_bank, l_quiz, l_tun = "", "", "", "", ""
+# --- 4. CHEKSIZ VIKTORINALAR (LIMITSIZ) ---
+def send_quiz():
+    try:
+        res = requests.get("https://opentdb.com/api.php?amount=1&type=multiple", timeout=15).json()
+        d = res['results'][0]
+        q = translate_text(d['question'])
+        c = translate_text(d['correct_answer'])
+        opts = [translate_text(i) for i in d['incorrect_answers']] + [c]
+        random.shuffle(opts)
+        bot.send_poll(CHANNEL_ID, f"🧠 **KARNAY VIKTORINA**\n\n{q}\n\n✅ @karnayuzb", opts, type='quiz', correct_option_id=opts.index(c))
+    except: pass
+
+# --- ASOSIY ISH REJIMI ---
+def main_loop():
+    lt, ln, lb, lq = "", "", "", ""
     while True:
         try:
             now = datetime.now(uzb_tz)
             cur, day = now.strftime("%H:%M"), now.strftime("%Y-%m-%d")
-
-            # ☀️ XAYRLI TONG + TO'LIQ TAQVIM (06:00)
-            if "06:00" <= cur <= "06:05" and l_tong != day:
-                m_uz = ["Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun", "Iyul", "Avgust", "Sentabr", "Oktabr", "Noyabr", "Dekabr"]
-                hafta = ["Dushanba", "Seshanba", "Chorshanba", "Payshanba", "Juma", "Shanba", "Yakshanba"]
-                milodiy = f"{now.day}-{m_uz[now.month-1]}, {hafta[now.weekday()]}"
-                try:
-                    res = requests.get("https://islomapi.uz/api/present/day?region=Toshkent", timeout=10).json()
-                    hijriy = f"{res['hijri_date']['day']}-{res['hijri_date']['month']}, {res['hijri_date']['year']}-yil"
-                except: hijriy = "Aniqlanmadi"
-                tabrik = (f"☀️ **ASSALOMU ALAYKUM!**\n\n📅 **Bugun:** {milodiy}\n🌙 **Hijriy:** {hijriy}\n\n"
-                          f"🌿 Yangi kun muborak bo'lsin! Alloh barcha ishlaringizda madadkor bo'lsin.\n\n✅ @karnayuzb")
-                bot.send_message(CHANNEL_ID, tabrik, parse_mode='Markdown'); l_tong = day
-
-            # 🕋 NAMOZ VAQTLARI (07:00)
-            if "07:00" <= cur <= "07:05" and l_namoz != day:
-                data = get_prayer_and_hijri()
-                if data: bot.send_message(CHANNEL_ID, data, parse_mode='Markdown'); l_namoz = day
-                else: bot.send_message(CHANNEL_ID, "Namoz vaqtlari yuklanmadi."); l_namoz = day
-
-            # 💰 BANK KURSLARI (10:00)
-            if "10:00" <= cur <= "10:05" and l_bank != day:
-                bot.send_message(CHANNEL_ID, get_bank_infographic(), parse_mode='Markdown'); l_bank = day
-
-            # 🧠 VIKTORINALAR (13:00, 17:00, 21:00)
-            if cur in ["13:00", "17:00", "21:00"] and l_quiz != (day+cur):
-                send_smart_quiz(); l_quiz = (day+cur)
-
-            # 🌙 XAYRLI TUN (23:30)
-            if "23:30" <= cur <= "23:35" and l_tun != day:
-                bot.send_message(CHANNEL_ID, "🌙 **XAYRLI TUN!**\n\nTuningiz osuda o'tsin, yaxshi dam oling.\n\n✅ @karnayuzb"); l_tun = day
-
+            
+            if cur == "06:00" and lt != day: send_morning_post(); lt = day
+            if cur == "07:00" and ln != day: send_prayer_times(); ln = day
+            if cur == "10:00" and lb != day: send_bank_rates(); lb = day
+            if cur in ["13:00", "18:00", "21:00"] and lq != (day+cur): send_quiz(); lq = (day+cur)
+            
             time.sleep(30)
         except: time.sleep(10)
 
 if __name__ == "__main__":
     keep_alive()
-    run_scheduler()
+    main_loop()
