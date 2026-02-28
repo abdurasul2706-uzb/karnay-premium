@@ -57,7 +57,7 @@ def send_morning_wish():
         milodiy = f"{now.day}-{oylar[now.month-1]}, {now.year}-yil ({kunlar[now.weekday()]})"
         
         # Hijriy sana
-        def get_guaranteed_hijri():
+def get_guaranteed_hijri():
     # 1-Manba: Islomapi (O'zbekiston uchun eng aniqi)
     try:
         res = requests.get("https://islomapi.uz/api/present/day?region=Toshkent", timeout=8).json()
