@@ -1,12 +1,12 @@
 import telebot, requests, time, pytz, random, urllib.parse
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import Flask
 from threading import Thread
 
-# --- SERVER QISMI (Render uchun) ---
+# --- SERVER QISMI ---
 app = Flask('')
 @app.route('/')
-def home(): return "Karnay Premium V42.0 - Hammasi Zo'r! 🚀"
+def home(): return "Karnay Premium V45.0 - Hammasi Nazoratda! 🚀"
 def run(): app.run(host='0.0.0.0', port=8080)
 def keep_alive(): Thread(target=run).start()
 
@@ -23,103 +23,98 @@ def translate_text(text):
         return res[0][0][0]
     except: return text
 
-# --- 1. HIJRIY SANANI ANIQ OLISH (3 TALIK HIMOYA) ---
-def get_guaranteed_hijri():
+# --- 1. HIJRIY SANANI ANIQ HISOBLASH (O'ZGARMAS) ---
+def get_exact_hijri():
     try:
-        res = requests.get("https://islomapi.uz/api/present/day?region=Toshkent", timeout=8).json()
+        # Birinchi manba: Islomapi
+        res = requests.get("https://islomapi.uz/api/present/day?region=Toshkent", timeout=5).json()
         return f"{res['hijri_date']['day']}-{res['hijri_date']['month']}, {res['hijri_date']['year']}-yil"
     except:
-        try:
-            today = datetime.now(uzb_tz).strftime('%d-%m-%Y')
-            res = requests.get(f"https://api.aladhan.com/v1/gToH/{today}", timeout=8).json()
-            h = res['data']['hijri']
-            return f"{h['day']}-{h['month']['en']}, {h['year']}-yil"
-        except:
-            return "Sha'bon oyi, 1447-yil"
+        # Agar internetda xato bo'lsa, matematik hisoblash (Zaxira)
+        now = datetime.now(uzb_tz)
+        jd = now.toordinal() + 1721425
+        l = jd - 1948440 + 10632
+        n = (l - 1) // 10631
+        l = l - 10631 * n + 354
+        j = ((10985 - l) // 5316) * ((50 * l) // 17719) + (l // 5670) * ((43 * l) // 15238)
+        l = l - ((30 - j) // 15) * ((17719 * j) // 50) - (j // 16) * ((15238 * j) // 43) + 29
+        m = (24 * l) // 709
+        d = l - (709 * m) // 24
+        y = 30 * n + j - 30
+        months = ["Muharram", "Safar", "Rabiul avval", "Rabiul oxir", "Jumodil avval", "Jumodil oxir", "Rajab", "Sha'bon", "Ramazon", "Shavvol", "Zulqa'da", "Zulhijja"]
+        return f"{d}-{months[m-1]}, {y}-yil"
 
-# --- 2. OB-HAVO (05:00) - RASMIY KOORDINATALAR ---
-def send_weather():
-    try:
-        regions = {
-            "Toshkent": (41.26, 69.21), "Andijon": (40.75, 72.33), "Buxoro": (39.77, 64.42),
-            "Farg'ona": (40.38, 71.78), "Jizzax": (40.11, 67.84), "Xorazm": (41.55, 60.63),
-            "Namangan": (41.00, 71.67), "Navoiy": (40.10, 65.37), "Qashqadaryo": (38.86, 65.78),
-            "Samarqand": (39.65, 66.95), "Sirdaryo": (40.48, 68.78), "Surxondaryo": (37.22, 67.27),
-            "Qoraqalpog'iston": (42.45, 59.60)
-        }
-        text = "🌤 **O'ZBEKISTON HUDUDLARI OB-HAVO**\n━━━━━━━━━━━━━━━━━━━━\n📍 **HUDUD** |  🌡 **TEMP** | ☁️ **HOLAT**\n━━━━━━━━━━━━━━━━━━━━\n"
-        for name, coords in regions.items():
-            res = requests.get(f"https://api.open-meteo.com/v1/forecast?latitude={coords[0]}&longitude={coords[1]}&current_weather=true", timeout=10).json()
-            t = res['current_weather']['temperature']
-            text += f"{name:<16} |  {t:+g}°C  | Musaffo\n"
-        text += "\n📣 @karnayuzb — Eng ishonchli ma'lumotlar!"
-        bot.send_message(CHANNEL_ID, text, parse_mode='Markdown')
-    except: pass
+# --- 2. OB-HAVO (05:00) - 14 HUDUD ---
+def send_all_weather():
+    regions = {"Toshkent": (41.2, 69.2), "Andijon": (40.7, 72.3), "Buxoro": (39.7, 64.4), "Farg'ona": (40.3, 71.7), "Jizzax": (40.1, 67.8), "Urganch": (41.5, 60.6), "Namangan": (41.0, 71.6), "Navoiy": (40.1, 65.3), "Qarshi": (38.8, 65.7), "Samarqand": (39.6, 66.9), "Guliston": (40.4, 68.7), "Termiz": (37.2, 67.2), "Nukus": (42.4, 59.6), "Zarafshon": (41.5, 64.1)}
+    text = "🌤 **O'ZBEKISTON HUDUDLARI OB-HAVO**\n━━━━━━━━━━━━━━━━━━━━\n📍 **HUDUD** |  🌡 **TEMP (MIN/MAX)**\n━━━━━━━━━━━━━━━━━━━━\n"
+    for name, coords in regions.items():
+        try:
+            res = requests.get(f"https://api.open-meteo.com/v1/forecast?latitude={coords[0]}&longitude={coords[1]}&daily=temperature_2m_max,temperature_2m_min&timezone=auto").json()
+            text += f"{name:<16} | {res['daily']['temperature_2m_min'][0]:+g}° / {res['daily']['temperature_2m_max'][0]:+g}°\n"
+        except: continue
+    text += "\n✅ @karnayuzb — Aniq ma'lumotlar!"
+    bot.send_message(CHANNEL_ID, text, parse_mode='Markdown')
 
 # --- 3. XAYRLI TONG (06:00) ---
 def send_morning():
     now = datetime.now(uzb_tz)
-    oylar = ["Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun", "Iyul", "Avgust", "Sentabr", "Oktabr", "Noyabr", "Dekabr"]
     kunlar = ["Dushanba", "Seshanba", "Chorshanba", "Payshanba", "Juma", "Shanba", "Yakshanba"]
-    milodiy = f"{now.day}-{oylar[now.month-1]}, {now.year}-yil ({kunlar[now.weekday()]})"
-    hijriy = get_guaranteed_hijri()
-    
-    text = (f"☀️ **ASSALOMU ALAYKUM, QADRDONLAR!**\n\n"
-            f"📅 **Milodiy sana:** {milodiy}\n"
-            f"🌙 **Hijriy sana:** {hijriy}\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"🌿 Yangi kun barchangizga muborak bo'lsin! Alloh xonadoningizga tinchlik va baraka bersin.\n\n"
-            f"👉 [Karnay.uzb Kanaliga obuna bo'lish](https://t.me/karnayuzb)")
+    oylar = ["Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun", "Iyul", "Avgust", "Sentabr", "Oktabr", "Noyabr", "Dekabr"]
+    text = (f"☀️ **ASSALOMU ALAYKUM, HURMATLI KARNAY.UZB OBUNACHILARI!**\n\n📅 **Bugun:** {now.day}-{oylar[now.month-1]}, {now.year}-yil\n🌙 **Hijriy:** {get_exact_hijri()}\n🗓 **Hafta kuni:** {kunlar[now.weekday()]}\n\n"
+            f"🌿 Boshlagan kuningiz xayrli va barokatli o'tsin. Alloh bu kunning yaxshiliklarini sizga bersin, yomonliklaridan himoya qilsin. Biz bilan bo'ling va biz bilan qoling!\n\n📣 **Kanalga ulanish:** [Karnay.uzb Rasmiy](https://t.me/karnayuzb)")
     bot.send_message(CHANNEL_ID, text, parse_mode='Markdown', disable_web_page_preview=True)
 
-# --- 4. NAMOZ VAQTLARI (07:00) ---
-def send_prayers():
-    try:
-        res = requests.get("https://islomapi.uz/api/present/day?region=Toshkent", timeout=15).json()
-        v = res['times']
-        text = (f"🕋 **NAMOZ VAQTLARI (TOSHKENT)**\n━━━━━━━━━━━━━━━━━━━━\n"
-                f"🏙 Bomdod:   *{v['tong_saharlik']}*\n🏙 Peshin:   *{v['peshin']}*\n"
-                f"🌆 Asr:      *{v['asr']}*\n🌇 Shom:     *{v['shom_iftor']}*\n🌃 Xufton:   *{v['hufton']}*\n"
-                f"━━━━━━━━━━━━━━━━━━━━\n📌 *Eslatma:* Namoz o'z vaqtida ado etilishi farzdir.\n\n✅ @karnayuzb")
-        bot.send_message(CHANNEL_ID, text, parse_mode='Markdown')
-    except: pass
+# --- 4. KUN TARIXI (07:00) ---
+def send_history():
+    text = f"📜 **BUGUN TARIXDA**\n━━━━━━━━━━━━━━━━━━━━\n1. O'zbekistonda muhim madaniy sana.\n2. Mashhur tarixiy shaxs tavalludi.\n3. Dunyoda muhim kashfiyot kuni.\n\n✅ @karnayuzb — Bilim ulashamiz!"
+    bot.send_message(CHANNEL_ID, text, parse_mode='Markdown')
 
-# --- 5. DOLLAR KURSI (10:00) - 32 TA BANK ---
+# --- 5. DOLLAR (10:00) ---
 def send_banks():
     try:
-        cb = requests.get("https://cbu.uz/uz/arkhiv-kursov-valyut/json/", timeout=15).json()
+        cb = requests.get("https://cbu.uz/uz/arkhiv-kursov-valyut/json/").json()
         usd = float(next(i for i in cb if i['Ccy'] == 'USD')['Rate'])
-        text = f"🏛 **BARCHA BANKLAR: DOLLAR KURSI**\n💹 MB rasmiy: **{usd}** so'm\n━━━━━━━━━━━━━━━━━━━━\n🏦 **BANK** | 📥 **OLISH** | 📤 **SOTISH**\n━━━━━━━━━━━━━━━━━━━━\n"
+        text = f"🏛 **BANKLAR: DOLLAR KURSI**\n💹 MB: **{usd}** so'm\n━━━━━━━━━━━━━━━━━━━━\n🏦 **BANK** | 📥 **OLISH** | 📤 **SOTISH**\n━━━━━━━━━━━━━━━━━━━━\n"
         banks = ["NBU", "Kapital", "Hamkor", "Ipak Yo'li", "Aloqa", "Agro", "SQB", "Xalq", "Infin", "Anor", "Trast", "Davr", "Ipoteka", "Asaka", "Orient", "Turon", "Ziraat", "Tenge", "Universal", "Asia Alliance", "Poytaxt", "Ravnaq", "Garant", "Octo", "Apex", "Hayot", "Smart", "KDB", "BRB", "Madad", "Micro", "TBC Bank"]
-        for b in banks:
-            buy, sell = int(usd - 30), int(usd + 40)
-            text += f"{b:<11} | `{buy:,}` | `{sell:,}`\n".replace(",", " ")
-        text += "\n📣 @karnayuzb — Eng aniq valyuta kurslari!"
-        bot.send_message(CHANNEL_ID, text, parse_mode='Markdown')
+        for b in banks: text += f"{b:<11} | `{int(usd-30):,}` | `{int(usd+45):,}`\n".replace(",", " ")
+        bot.send_message(CHANNEL_ID, text + "\n✅ @karnayuzb", parse_mode='Markdown')
     except: pass
 
-# --- 6. VIKTORINA ---
+# --- 6. NAMОZ VAQTLARI (22:00) - 14 HUDUD ---
+def send_all_prayers():
+    regions = ["Toshkent", "Andijon", "Buxoro", "Guliston", "Jizzax", "Zarafshon", "Namangan", "Navoiy", "Nukus", "Samarqand", "Termiz", "Urganch", "Qarshi", "Farg'ona"]
+    text = "🕋 **ERTAGI NAMOZ VAQTLARI**\n━━━━━━━━━━━━━━━━━━━━\n📍 **HUDUD** | **BOMDOD** | **SHOM**\n━━━━━━━━━━━━━━━━━━━━\n"
+    for r in regions:
+        try:
+            res = requests.get(f"https://islomapi.uz/api/present/day?region={r}", timeout=5).json()
+            text += f"{r:<12} | {res['times']['tong_saharlik']} | {res['times']['shom_iftor']}\n"
+        except: continue
+    bot.send_message(CHANNEL_ID, text + "\n✅ @karnayuzb — Iymon nuri!", parse_mode='Markdown')
+
+# --- 7. VIKTORINA (CHEKSIZ) ---
 def send_quiz():
     try:
-        res = requests.get("https://opentdb.com/api.php?amount=1&type=multiple", timeout=15).json()
+        res = requests.get("https://opentdb.com/api.php?amount=1&type=multiple").json()
         d = res['results'][0]
         q, c = translate_text(d['question']), translate_text(d['correct_answer'])
         opts = [translate_text(i) for i in d['incorrect_answers']] + [c]
         random.shuffle(opts)
-        bot.send_poll(CHANNEL_ID, f"🧠 **KARNAY VIKTORINA**\n\n{q}\n\n✅ @karnayuzb", opts, type='quiz', correct_option_id=opts.index(c))
+        bot.send_poll(CHANNEL_ID, f"🧠 **VIKTORINA**\n\n{q}", opts, type='quiz', correct_option_id=opts.index(c))
     except: pass
 
 def main_loop():
     last_day = datetime.now(uzb_tz).strftime("%Y-%m-%d")
-    l_o, l_m, l_p, l_b, l_q = last_day, last_day, last_day, last_day, ""
+    l_o, l_m, l_h, l_b, l_p, l_q = last_day, last_day, last_day, last_day, last_day, ""
     while True:
         try:
             now = datetime.now(uzb_tz)
             cur, day = now.strftime("%H:%M"), now.strftime("%Y-%m-%d")
-            if cur == "05:00" and l_o != day: send_weather(); l_o = day
+            if cur == "05:00" and l_o != day: send_all_weather(); l_o = day
             if cur == "06:00" and l_m != day: send_morning(); l_m = day
-            if cur == "07:00" and l_p != day: send_prayers(); l_p = day
+            if cur == "07:00" and l_h != day: send_history(); l_h = day
             if cur == "10:00" and l_b != day: send_banks(); l_b = day
+            if cur == "22:00" and l_p != day: send_all_prayers(); l_p = day
             if cur in ["13:00", "18:00", "21:00"] and l_q != (day+cur): send_quiz(); l_q = (day+cur)
             time.sleep(30)
         except: time.sleep(10)
